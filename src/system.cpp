@@ -1,26 +1,10 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
-
-// Define Chip-8 components
-typedef unsigned char byte;
-typedef unsigned short word;
-
-byte memory[4096]; // 4K memory
-byte V[16];        // 16 registers (V0 to VF)
-word I;            // Index register
-word pc;           // Program counter
-bool drawFlag;     // Indicates if the screen needs to be redrawn
-
-byte display[64 * 32]; // Display (64x32 pixels) (8 bytes x 4 bytes)
-std::vector<word> stack;
-int sp; // stack pointer
-
-byte delayTimer;
-byte soundTimer;
+#include "system.h"
 
 // Load game into memory starting at 0x200 (512/4095)
-void LoadGame()
+void System::LoadGame()
 {
     // Read file
     std::ifstream rom{"2-ibm-logo.ch8", std::ios::binary | std::ios::ate};
@@ -43,7 +27,7 @@ void LoadGame()
 }
 
 // Read instruction at pc and increment pc
-word FetchObcode()
+word System::FetchObcode()
 {
     byte firstHalf = memory[pc];
     byte secondHalf = memory[pc + 1];
@@ -52,7 +36,7 @@ word FetchObcode()
     return instruction;
 }
 
-void DecodeExecute(word instruction)
+void System::DecodeExecute(word instruction)
 {
 
     // Get components
@@ -138,26 +122,20 @@ void DecodeExecute(word instruction)
     }
 }
 
-int main()
+System::System()
+    : I{0}, pc{0x200}, drawFlag{false}, sp{0}, delayTimer{0}, soundTimer{0}
 {
-    LoadGame();
-
-    for (;;)
+    // Initialize memory and registers to 0
+    for (int i = 0; i < 4096; ++i)
     {
-        word instruction = FetchObcode();
-        DecodeExecute(instruction);
-
-        if (drawFlag)
-        {
-            for (int i = 0; i < 64 * 32; ++i)
-            {
-                std::cout << static_cast<int>(display[i]);
-                if ((i + 1) % 64 == 0)
-                    std::cout << '\n';
-            }
-            drawFlag = false;
-        }
+        memory[i] = 0;
     }
-
-    return 0;
+    for (int i = 0; i < 16; ++i)
+    {
+        V[i] = 0;
+    }
+    for (int i = 0; i < 64 * 32; ++i)
+    {
+        display[i] = 0;
+    }
 }
