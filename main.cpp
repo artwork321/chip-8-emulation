@@ -11,7 +11,7 @@ byte V[16];        // 16 registers (V0 to VF)
 word I;            // Index register
 word pc;           // Program counter
 
-byte display[64 * 32]; // Display (64x32 pixels)
+byte display[64 * 32]; // Display (64x32 pixels) (8 bytes x 4 bytes)
 std::vector<word> stack;
 int sp; // stack pointer
 
@@ -33,12 +33,12 @@ void LoadGame()
     // Load all data into memory starting at 0x200
     std::streamsize size = rom.tellg();
     rom.seekg(0, std::ios::beg);
-    rom.read(reinterpret_cast<char *>(&memory[512]), size);
+    rom.read(reinterpret_cast<char *>(&memory[0x200]), size);
 
-    std::cout << "Loaded " << size << " bytes, example: " << static_cast<int>(memory[512]) << ".\n";
+    std::cout << "Loaded " << size << " bytes, example: " << static_cast<int>(memory[0x200]) << ".\n";
 
     // Set program counter to 0x200
-    pc = 512;
+    pc = 0x200;
 }
 
 // Read instruction at pc and increment pc
@@ -51,28 +51,87 @@ word FetchObcode()
     return instruction;
 }
 
-void Decode(word instruction)
+void DecodeExecute(word instruction)
 {
 
-    switch (instruction)
+    // Get components
+    byte firstNibble = instruction & 0xF000;
+    byte secondNibble = instruction & 0x0F00;
+    byte thirdNibble = instruction & 0x00F0;
+    byte lastNibble = instruction & 0x000F;
+
+    // 00E0: clear screen
+    switch (firstNibble)
     {
-    // 00E0 (clear screen)
-    case 0x00E0:
-        for (int i = 0; i < 64 * 32; ++i)
+    case 0x0000:
+        if (instruction == 0x00E0)
         {
-            display[i] = 0;
+            // Clear display
+            for (int i = 0; i < 64 * 32; ++i)
+            {
+                display[i] = 0;
+            }
         }
         break;
-        // 1NNN (jump)
-        // 6XNN (set register VX)
-        // 7XNN (add value to register VX)
-        // ANNN (set index register I)
-        // DXYN (display/draw)
+    // 1NNN: jump to address NNN
+    case 0x1000:
+        word address = instruction & 0x0FFF;
+        pc = address;
+        break;
+    // 6XNN (set register VX)
+    case 0x6000:
+        V[secondNibble >> 8] = instruction & 0x00FF;
+        break;
+    // 7XNN (add value to register VX)
+    case 0x7000:
+        V[secondNibble >> 8] += instruction & 0x00FF;
+        break;
+    // ANNN (set index register I)
+    case 0xA000:
+        I = instruction & 0x0FFF;
+        break;
+    // DXYN (display/draw)
+    case 0xD000:
+        // Extract coordinates
+        byte x = V[secondNibble >> 8];
+        byte y = V[thirdNibble >> 4];
+        byte height = lastNibble;
+
+        // Draw sprite at (x, y) with height N
+        V[0xF] = 0; // Reset collision flag
+
+        for (int j = 0; j < height; ++j)
+        {
+            // XOR each sprite pixel with the screen; only when a sprite pixel of 1 turns a screen pixel from 1 → 0 is VF set.
+            // Otherwise, pixels are either turned on or unchanged.
+            byte sprite = memory[I + j];
+
+            for (int i = 0; i < 8; ++i)
+            {
+                byte pixel = (sprite >> (7 - i)) & 1;
+
+                if (pixel == 1 && display[x + y * 64 + i] == 1)
+                {
+                    V[0xF] = 1; // Set collision flag
+                }
+
+                display[x + y * 64 + i] ^= pixel;
+            }
+        }
+
+        break;
     }
 }
 
 int main()
 {
     LoadGame();
+
+    for (;;)
+    {
+        word instruction = FetchObcode();
+        DecodeExecute(instruction);
+    }
+
     return 0;
 }
