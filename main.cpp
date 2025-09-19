@@ -10,6 +10,7 @@ byte memory[4096]; // 4K memory
 byte V[16];        // 16 registers (V0 to VF)
 word I;            // Index register
 word pc;           // Program counter
+bool drawFlag;     // Indicates if the screen needs to be redrawn
 
 byte display[64 * 32]; // Display (64x32 pixels) (8 bytes x 4 bytes)
 std::vector<word> stack;
@@ -47,7 +48,7 @@ word FetchObcode()
     byte firstHalf = memory[pc];
     byte secondHalf = memory[pc + 1];
     pc += 2;
-    word instruction{firstHalf << 8 | secondHalf};
+    word instruction{static_cast<word>(firstHalf << 8 | secondHalf)};
     return instruction;
 }
 
@@ -55,10 +56,10 @@ void DecodeExecute(word instruction)
 {
 
     // Get components
-    byte firstNibble = instruction & 0xF000;
-    byte secondNibble = instruction & 0x0F00;
-    byte thirdNibble = instruction & 0x00F0;
-    byte lastNibble = instruction & 0x000F;
+    word firstNibble = instruction & 0xF000;
+    word secondNibble = instruction & 0x0F00;
+    word thirdNibble = instruction & 0x00F0;
+    word lastNibble = instruction & 0x000F;
 
     // 00E0: clear screen
     switch (firstNibble)
@@ -75,23 +76,36 @@ void DecodeExecute(word instruction)
         break;
     // 1NNN: jump to address NNN
     case 0x1000:
+    {
         word address = instruction & 0x0FFF;
         pc = address;
         break;
+    }
+
     // 6XNN (set register VX)
     case 0x6000:
+    {
         V[secondNibble >> 8] = instruction & 0x00FF;
         break;
+    }
+
     // 7XNN (add value to register VX)
     case 0x7000:
+    {
         V[secondNibble >> 8] += instruction & 0x00FF;
         break;
+    }
+
     // ANNN (set index register I)
     case 0xA000:
+    {
         I = instruction & 0x0FFF;
         break;
+    }
+
     // DXYN (display/draw)
     case 0xD000:
+    {
         // Extract coordinates
         byte x = V[secondNibble >> 8];
         byte y = V[thirdNibble >> 4];
@@ -118,8 +132,9 @@ void DecodeExecute(word instruction)
                 display[x + y * 64 + i] ^= pixel;
             }
         }
-
+        drawFlag = true; // Indicate that the screen needs to be redrawn
         break;
+    }
     }
 }
 
@@ -131,6 +146,17 @@ int main()
     {
         word instruction = FetchObcode();
         DecodeExecute(instruction);
+
+        if (drawFlag)
+        {
+            for (int i = 0; i < 64 * 32; ++i)
+            {
+                std::cout << static_cast<int>(display[i]);
+                if ((i + 1) % 64 == 0)
+                    std::cout << '\n';
+            }
+            drawFlag = false;
+        }
     }
 
     return 0;
