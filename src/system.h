@@ -18,6 +18,7 @@ public:
     bool ShouldDraw() const { return drawFlag; }
     const byte *GetDisplay() const { return display; }
     void ResetDrawFlag() { drawFlag = false; }
+    void OneCycle();
 
 private:
     byte memory[4096]; // 4K memory

@@ -113,13 +113,19 @@ void System::DecodeExecute(word instruction)
                     V[0xF] = 1; // Set collision flag
                 }
 
-                display[x + y * 64 + i] ^= pixel;
+                display[x + (y + j) * 64 + i] ^= pixel;
             }
         }
         drawFlag = true; // Indicate that the screen needs to be redrawn
         break;
     }
     }
+}
+
+void System::OneCycle()
+{
+    word instruction = FetchObcode();
+    DecodeExecute(instruction);
 }
 
 System::System()
@@ -139,3 +145,5 @@ System::System()
         display[i] = 0;
     }
 }
+
+System::~System() {}
